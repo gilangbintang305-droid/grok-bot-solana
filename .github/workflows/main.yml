@@ -1,24 +1,59 @@
-- name: Force JVM 17
+name: Build Grok Bot APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Accept Android licenses
         run: |
-          cat > "$RUNNER_TEMP/force-jvm.gradle" <<'EOF'
-          import org.gradle.api.tasks.compile.JavaCompile
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-          allprojects {
-              tasks.withType(JavaCompile).configureEach {
-                  sourceCompatibility = "17"
-                  targetCompatibility = "17"
-              }
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
-              tasks.configureEach {
-                  if (it.class.name.contains("KotlinCompile")) {
-                      it.kotlinOptions.jvmTarget = "17"
-                  }
-              }
-          }
-          EOF
+      - name: Extract project
+        run: |
+          mkdir -p project
+          ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n 1)
+          test -n "$ZIP_FILE"
+          unzip -q "$ZIP_FILE" -d project
+
+      - name: Find Android project
+        run: |
+          PROJECT_DIR=$(dirname "$(find project -name settings.gradle.kts -o -name settings.gradle | head -n 1)")
+          test -n "$PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Configure JVM targets
+        run: |
+          find "$PROJECT_DIR/app" -maxdepth 1 -type f -name 'build.gradle*' -print
 
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
-          gradle --stop
-          gradle -I "$RUNNER_TEMP/force-jvm.gradle" assembleDebug --no-daemon --stacktrace
+          gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrokBotSolana-APK
+          path: project/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
