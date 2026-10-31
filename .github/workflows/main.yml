@@ -1,10 +1,9 @@
-
 name: Build Grok Bot APK
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,16 +18,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-android {
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-}
       - name: Accept Android licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -45,11 +35,19 @@ android {
           ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' | head -n 1)
           test -n "$ZIP_FILE"
           unzip -q "$ZIP_FILE" -d project
-          find project -name settings.gradle.kts
+
+      - name: Find Android project
+        run: |
+          PROJECT_DIR=$(dirname "$(find project -name settings.gradle.kts -o -name settings.gradle | head -n 1)")
+          test -n "$PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Configure JVM targets
+        run: |
+          find "$PROJECT_DIR/app" -maxdepth 1 -type f -name 'build.gradle*' -print
 
       - name: Build APK
         run: |
-          PROJECT_DIR=$(dirname "$(find project -name settings.gradle.kts | head -n 1)")
           cd "$PROJECT_DIR"
           gradle assembleDebug
 
@@ -58,3 +56,4 @@ android {
         with:
           name: GrokBotSolana-APK
           path: project/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
