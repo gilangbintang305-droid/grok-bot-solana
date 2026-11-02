@@ -1,9 +1,10 @@
-name: Build Grok Bot APK
+
+name: Build GROK BOT SOLANA
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-  workflow_dispatch:
 
 jobs:
   build:
@@ -38,13 +39,9 @@ jobs:
 
       - name: Find Android project
         run: |
-          PROJECT_DIR=$(dirname "$(find project -name settings.gradle.kts -o -name settings.gradle | head -n 1)")
+          PROJECT_DIR=$(dirname "$(find project \( -name settings.gradle.kts -o -name settings.gradle \) | head -n 1)")
           test -n "$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-
-      - name: Configure JVM targets
-        run: |
-          find "$PROJECT_DIR/app" -maxdepth 1 -type f -name 'build.gradle*' -print
 
       - name: Build APK
         run: |
@@ -57,3 +54,4 @@ jobs:
           name: GrokBotSolana-APK
           path: project/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
